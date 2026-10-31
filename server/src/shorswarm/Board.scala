@@ -37,7 +37,7 @@ final class Board(random: Random, startBits: Int, maxBits: Int, now: () => Long 
   val leaseMillis: Long = 60000
 
   /** Shots one browser may hold at once: the most workers a tab runs. */
-  val leasesPerPeer: Int = 4
+  val leasesPerPeer: Int = Protocol.MaxWorkers
 
   private final class Run(val a: Long):
     var shots = 0

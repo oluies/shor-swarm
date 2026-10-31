@@ -34,7 +34,7 @@ object Page:
   // This script's own URL, which every worker loads; only valid while the script first runs.
   private val script = dom.document.asInstanceOf[js.Dynamic].currentScript.src.asInstanceOf[String]
   private val cores = js.Dynamic.global.navigator.hardwareConcurrency.asInstanceOf[js.UndefOr[Int]].getOrElse(2)
-  private val workerCount = (cores / 2).max(1).min(4)
+  private val workerCount = (cores / 2).max(1).min(Protocol.MaxWorkers)
 
   private val workers: Vector[dom.Worker] = Vector.fill(workerCount)(new dom.Worker(script))
   private val idle: mutable.Queue[dom.Worker] = mutable.Queue.from(workers)
