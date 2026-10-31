@@ -37,6 +37,12 @@ final case class Swarm(
 ) derives ReadWriter
 
 object Protocol:
+  /** Workers one tab runs at most, and so the leases the server lets one browser hold. One number
+    * for both sides: a client allowed more workers than leases would send Ready messages the server
+    * ignores, and those workers would wait for work that never comes.
+    */
+  val MaxWorkers: Int = 4
+
   /** Bins the histogram is drawn with: `y / 2^t` in `[0, 1)`, split evenly. */
   val Bins: Int = 64
 
