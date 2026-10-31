@@ -1,0 +1,7 @@
+out/
+.bsp/
+.idea/
+.metals/
+.vscode/
+.DS_Store
+/scotty

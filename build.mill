@@ -1,0 +1,108 @@
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.scalajslib.*
+import mill.scalajslib.api.*
+import mill.api.BuildCtx
+
+/** shor-swarm: Shor's algorithm, one shot per browser.
+  *
+  * Three modules. `shared` holds the messages and Scotty's `IterativeShor`, compiled twice: for the
+  * JVM server and for the Scala.js client. `server` is a Cask app that hands out shots over a
+  * WebSocket, collects the measured values and does the continued fractions. `client` runs the shots
+  * in Web Workers.
+  *
+  * `IterativeShor` is compiled from a Scotty checkout rather than taken from the published jar:
+  * Scotty publishes no Scala.js artifact, and its GitHub Packages registry needs a token even to read.
+  * The checkout is found by `scottyDir`; CI checks out the tag that `scottyTag` names.
+  */
+object Versions {
+  val scala = "3.9.0"
+  val scalaJS = "1.22.0"
+  val upickle = "4.4.3"
+  val cask = "0.11.3"
+  val scalajsDom = "2.8.1"
+  val munit = "1.3.6"
+  val scottyTag = "v0.7.1"
+}
+
+/** The Scotty checkout: `$SCOTTY_DIR`, else `./scotty` (where CI checks it out, git-ignored), else
+  * `../scotty` beside this repository.
+  */
+def scottyDir: os.Path =
+  sys.env.get("SCOTTY_DIR").map(os.Path(_, BuildCtx.workspaceRoot))
+    .orElse(Option(BuildCtx.workspaceRoot / "scotty").filter(os.exists))
+    .getOrElse(BuildCtx.workspaceRoot / os.up / "scotty")
+
+trait Shared extends ScalaModule {
+  def scalaVersion = Versions.scala
+
+  def scalacOptions = Seq("-deprecation", "-feature", "-unchecked")
+
+  def sources = Task.Sources(BuildCtx.workspaceRoot / "shared" / "src")
+
+  def scottySource = Task.Source(scottyDir / "src" / "main" / "scala" / "scotty" / "algorithm" / "IterativeShor.scala")
+
+  def generatedSources = Task {
+    val source = scottySource().path
+    if (!os.exists(source)) sys.error(s"$source not found: check out Scotty ${Versions.scottyTag} beside this repository, or set SCOTTY_DIR")
+    os.copy.into(source, Task.dest)
+    Seq(PathRef(Task.dest))
+  }
+}
+
+object shared extends Module {
+  object jvm extends Shared {
+    def mvnDeps = Seq(mvn"com.lihaoyi::upickle:${Versions.upickle}")
+  }
+
+  object js extends Shared with ScalaJSModule {
+    def scalaJSVersion = Versions.scalaJS
+
+    def mvnDeps = Seq(mvn"com.lihaoyi::upickle::${Versions.upickle}")
+  }
+}
+
+object client extends ScalaJSModule {
+  def scalaVersion = Versions.scala
+
+  def scalaJSVersion = Versions.scalaJS
+
+  def scalacOptions = Seq("-deprecation", "-feature", "-unchecked")
+
+  def moduleDeps = Seq(shared.js)
+
+  def mvnDeps = Seq(mvn"org.scala-js::scalajs-dom::${Versions.scalajsDom}")
+
+  // One script for the page and its Web Workers: Main tells them apart at start-up.
+  def moduleKind = ModuleKind.NoModule
+}
+
+object server extends ScalaModule {
+  def scalaVersion = Versions.scala
+
+  def scalacOptions = Seq("-deprecation", "-feature", "-unchecked")
+
+  def moduleDeps = Seq(shared.jvm)
+
+  def mvnDeps = Seq(mvn"com.lihaoyi::cask:${Versions.cask}", mvn"com.lihaoyi::upickle:${Versions.upickle}")
+
+  def mainClass = Some("shorswarm.Server")
+
+  /** The page itself, declared as a source so Mill tracks it. */
+  def page = Task.Source("resources/web")
+
+  // The page, and the client linked for production, served from the classpath under /web.
+  def resources = Task {
+    val linked = client.fullLinkJS().dest.path
+    val web = Task.dest / "web"
+    os.copy(page().path, web, createFolders = true, replaceExisting = true)
+    os.list(linked).filter(_.ext == "js").foreach(f => os.copy.over(f, web / f.last))
+    Seq(PathRef(Task.dest))
+  }
+
+  object test extends ScalaTests with TestModule.Munit {
+    def mvnDeps = Seq(mvn"org.scalameta::munit:${Versions.munit}")
+  }
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shor swarm</title>
+<meta name="description" content="Shor's algorithm, simulated one shot per browser: join the swarm and help factor a semiprime.">
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1a1a18; --muted: #5f5f5a; --rule: #ddddd8; --panel: #fff;
+    --accent: #1f6f8b; --bar: #1f6f8b; --control: #85857f;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414; --fg: #e8e8e4; --muted: #a3a39d; --rule: #2e2e2c; --panel: #1c1c1b;
+      --accent: #5fb8d6; --bar: #5fb8d6; --control: #707069;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0 16px 48px; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 2rem 0 .3rem; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; }
+  .lede, .muted { color: var(--muted); }
+  .lede { max-width: 70ch; }
+  .note { border-left: 3px solid var(--accent); background: var(--panel); padding: .6rem .9rem;
+    margin: 1.2rem 0; color: var(--muted); font-size: .92rem; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin: 1rem 0; }
+  .stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: .6rem .8rem; }
+  .stat > span { display: block; color: var(--muted); font-size: .8rem; }
+  .stat b { font-size: 1.25rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .8rem; }
+  .run { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: .6rem .8rem; }
+  .run-head { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; font-size: .9rem; }
+  .run svg { width: 100%; height: 70px; display: block; margin-top: .4rem; }
+  .run rect { fill: var(--bar); }
+  ul { padding-left: 1.2rem; }
+  li { margin: .3rem 0; overflow-wrap: anywhere; }
+  button { font: inherit; padding: .4rem 1rem; border-radius: 4px; border: 1px solid var(--control);
+    background: var(--panel); color: var(--fg); cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Shor swarm</h1>
+  <p class="lede">
+    Every browser on this page simulates shots of Shor's algorithm and sends back what it measured.
+    The server collects them, recovers a period with continued fractions, and factors the semiprime.
+    Then it moves on to a bigger one.
+  </p>
+
+  <div class="note" role="note">
+    <strong>This is a classical simulation, not a quantum computer.</strong> Each shot runs Scotty's
+    <code>IterativeShor</code> on a state vector of <code>2^(L+1)</code> amplitudes, so the work grows
+    exponentially with the size of the number; a laptop factors these numbers instantly by classical
+    means. The bases are random, bases sharing a factor with N are skipped, and the server keeps a
+    factorisation only if its period and its factors check out, so nothing here is compiled with the
+    answer and a wrong report cannot produce a wrong result.
+  </div>
+
+  <div class="controls">
+    <button id="pause" type="button">Pause</button>
+    <span class="muted"><span id="connection" aria-live="polite">connecting</span> &middot;
+      this tab runs <span id="workers">0</span> worker(s), <span id="mine">0</span> shots so far,
+      last one <span id="last">&ndash;</span></span>
+  </div>
+
+  <div class="stats" aria-live="polite">
+    <div class="stat"><span>Factoring N</span><b id="n">&ndash;</b></div>
+    <div class="stat"><span>Bits / qubits</span><b><span id="bits">&ndash;</span> / <span id="qubits">&ndash;</span></b></div>
+    <div class="stat"><span>Counting bits t</span><b id="t">&ndash;</b></div>
+    <div class="stat"><span>Browsers</span><b id="peers">&ndash;</b></div>
+    <div class="stat"><span>Shots in flight</span><b id="inflight">&ndash;</b></div>
+    <div class="stat"><span>Shots measured</span><b id="shots">&ndash;</b></div>
+  </div>
+
+  <h2>Bases being tried</h2>
+  <p class="muted">Each histogram is the measured <code>y / 2^t</code>: it piles up at multiples of
+    <code>1 / r</code>, where <code>r</code> is the period of <code>a</code> modulo N.</p>
+  <div class="runs" id="runs"></div>
+
+  <h2>Factored so far</h2>
+  <ul id="factored"><li class="muted">Nothing yet.</li></ul>
+
+  <p class="muted">Built on <a href="https://oluies.github.io/scotty/">Scotty</a>'s
+    <a href="https://oluies.github.io/scotty/algorithms/shor/#shor-on-l--1-qubits">IterativeShor</a>,
+    after Willsch et al., arXiv:2308.05047. Source:
+    <a href="https://github.com/oluies/shor-swarm">oluies/shor-swarm</a>.</p>
+</main>
+<script src="main.js"></script>
+</body>
+</html>

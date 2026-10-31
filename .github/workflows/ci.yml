@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # IterativeShor is compiled from this Scotty tag; keep it in step with scottyTag in build.mill.
+  SCOTTY_REF: v0.7.1
+
+jobs:
+  build:
+    name: test, link, assemble
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out Scotty
+        uses: actions/checkout@v7
+        with:
+          repository: oluies/scotty
+          ref: ${{ env.SCOTTY_REF }}
+          path: scotty
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Cache Mill and Coursier
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/mill
+            ~/.cache/coursier
+          key: mill-${{ hashFiles('build.mill', '.mill-version') }}
+          restore-keys: mill-
+      - name: Server tests, against real IterativeShor shots
+        run: ./mill server.test
+      - name: Link the client for the browser
+        run: ./mill client.fullLinkJS
+      - name: Assemble the server jar, page and client included
+        run: ./mill server.assembly
