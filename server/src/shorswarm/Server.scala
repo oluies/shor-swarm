@@ -36,10 +36,12 @@ class SwarmServer(board: Board, override val port: Int, override val host: Strin
     cask.WsActor {
       case cask.Ws.Text(text) =>
         Try(read[ToServer](text)).foreach {
-          case ToServer.Ready                => send(onBoard(_.issue()))
+          case ToServer.Ready                => onBoard(_.issue(id)).foreach(send)
           case ToServer.Result(job, y, _)    => onBoard(_.submit(job, y))
         }
-      case cask.Ws.Close(_, _) | cask.Ws.ChannelClosed() => peers.remove(id)
+      case cask.Ws.Close(_, _) | cask.Ws.ChannelClosed() =>
+        peers.remove(id)
+        onBoard(_.release(id))
     }
   }
 
