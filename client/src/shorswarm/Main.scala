@@ -86,9 +86,10 @@ object Page:
     ws.onclose = (_: dom.CloseEvent) =>
       socket = None
       el("connection").textContent = "reconnecting"
-      // Shots in flight are lost with the connection; the server simply hands out others.
-      busy.keys.foreach(idle.enqueue)
-      busy.clear()
+      // Busy workers stay busy: their shots keep running and return them to `idle` when done, so
+      // putting them back now would queue each twice. Their results go out on the new connection,
+      // where the server, having released this connection's leases, ignores them. Unanswered
+      // Ready messages died with the socket.
       pending = 0
       dom.window.setTimeout(() => connect(), 2000)
 

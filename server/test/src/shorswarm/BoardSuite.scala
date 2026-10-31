@@ -19,7 +19,7 @@ class BoardSuite extends munit.FunSuite:
 
   test("the board starts on a semiprime of the requested size, with a coprime base") {
     val board = Board(Random(1), 12, 14)
-    val job = board.issue()
+    val job = board.issue(1).get
 
     assertEquals(java.lang.Long.numberOfLeadingZeros(job.n), 64 - 12)
     assertEquals(job.t, 2 * IterativeShor.width(job.n))
@@ -33,7 +33,7 @@ class BoardSuite extends munit.FunSuite:
     var shots = 0
 
     while factored.size < 3 && shots < 2000 do
-      val job = board.issue()
+      val job = board.issue(1).get
       board.submit(job.jobId, shoot(job, random)).foreach(f => factored :+= f)
       shots += 1
 
@@ -48,7 +48,7 @@ class BoardSuite extends munit.FunSuite:
 
   test("a result that is unknown, out of range, repeated or for an earlier modulus is ignored") {
     val board = Board(Random(4), 10, 12)
-    val job = board.issue()
+    val job = board.issue(1).get
 
     assertEquals(board.submit(job.jobId + 99, 1), None)
     assertEquals(board.submit(job.jobId, 1L << job.t), None)
@@ -61,7 +61,7 @@ class BoardSuite extends munit.FunSuite:
   test("leases run out, so a closed tab's shot leaves the books") {
     var clock = 0L
     val board = Board(Random(5), 10, 12, () => clock)
-    val job = board.issue()
+    val job = board.issue(1).get
 
     assertEquals(board.snapshot(1).workers, 1)
     clock += board.leaseMillis + 1
@@ -77,8 +77,40 @@ class BoardSuite extends munit.FunSuite:
     val board = Board(Random(7), 10, 12)
 
     (0 until 3000).foreach: _ =>
-      val job = board.issue()
+      val job = board.issue(1).get
       board.submit(job.jobId, noise.nextLong(1L << job.t)).foreach: f =>
         assertEquals(f.p * f.q, f.n)
         assertEquals(BigInt(f.a).modPow(f.period, f.n), BigInt(1))
+  }
+
+  test("late results for an abandoned base do not start more bases") {
+    // y = 0 gives no period, so a base given only zeros is abandoned after shotsPerBase shots. The
+    // shots still in flight then arrive late, and must not each start another base.
+    val board = Board(Random(8), 10, 12)
+    val first = board.snapshot(0).runs.head.a
+    // Spread over enough browsers that none exceeds its share of leases.
+    val jobs = (0 until board.shotsPerBase + 6).map(i => board.issue(1 + i / board.leasesPerPeer).get)
+    jobs.foreach(job => board.submit(job.jobId, 0))
+
+    val runs = board.snapshot(0).runs
+    assertEquals(runs.map(_.a).distinct.size, 2, s"bases now: ${runs.map(_.a)}")
+    assertEquals(runs.head.a, first)
+    assertEquals(runs.head.shots, board.shotsPerBase, "late results counted toward the abandoned base")
+  }
+
+  test("a board of 4 bits is refused, since no 4-bit semiprime of two odd primes exists") {
+    intercept[IllegalArgumentException](Board(Random(9), 4, 8))
+    assertEquals(Board(Random(9), 5, 8).n, 21L)
+  }
+
+  test("one browser cannot hold more than its share of leases") {
+    val board = Board(Random(10), 10, 12)
+    val granted = (0 until 100).flatMap(_ => board.issue(peer = 1))
+
+    assertEquals(granted.size, board.leasesPerPeer)
+    assert(board.issue(peer = 2).isDefined, "another browser still gets work")
+    board.submit(granted.head.jobId, 0)
+    assert(board.issue(peer = 1).isDefined, "a result frees a lease")
+    board.release(peer = 1)
+    assertEquals((0 until board.leasesPerPeer).flatMap(_ => board.issue(peer = 1)).size, board.leasesPerPeer, "a closed connection frees them all")
   }
