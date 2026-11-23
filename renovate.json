@@ -2,5 +2,118 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "description": [
+    "Renovate's onboarding detected only .github/workflows/ci.yml here, because",
+    "it has NO Mill manager. build.mill was therefore invisible, and every JVM",
+    "dependency in it (7 of them) went untracked -- the dashboard looked",
+    "healthy while the actual dependency surface was unmanaged.",
+    "",
+    "There is no Scala Steward in this repository either, so nothing else was",
+    "covering them.",
+    "",
+    "The customManagers below match the `Versions` object, not the mvn\"...\" call",
+    "sites: the literals live in Versions and the call sites only interpolate",
+    "${Versions.x}, so matching the usage would capture nothing.",
+    "",
+    "Each coordinate was verified against Maven Central before being written",
+    "here -- the Scala suffix is not guessable. mvn\"org::artifact:ver\" resolves",
+    "to _3, mvn\"org::artifact::ver\" (double colon twice) to _sjs1_3 for",
+    "Scala.js, and mvn\"org:artifact:ver\" to no suffix at all."
+  ],
+  "packageRules": [
+    {
+      "description": "Keep the build.mill bumps in one PR rather than one per coordinate.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "groupName": "scala-beroenden"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Versions.scala in build.mill -> org.scala-lang:scala3-library_3. Scala 3 compiler/library line",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+scala\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "org.scala-lang:scala3-library_3",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.scalaJS in build.mill -> org.scala-js:scalajs-library_2.13. Scala.js version (def scalaJSVersion)",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+scalaJS\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "org.scala-js:scalajs-library_2.13",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.upickle in build.mill -> com.lihaoyi:upickle_3. used BOTH as ::upickle: (JVM _3) and ::upickle:: (Scala.js _sjs1_3); the two are published together, so tracking the JVM artifact moves both",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+upickle\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "com.lihaoyi:upickle_3",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.cask in build.mill -> com.lihaoyi:cask_3. JVM only",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+cask\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "com.lihaoyi:cask_3",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.scalajsDom in build.mill -> org.scala-js:scalajs-dom_sjs1_3. Scala.js ONLY -- scalajs-dom_3 does not exist (404); the suffix must be _sjs1_3",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+scalajsDom\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "org.scala-js:scalajs-dom_sjs1_3",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.munit in build.mill -> org.scalameta:munit_3. JVM test framework",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+munit\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "org.scalameta:munit_3",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions.scottyTag in build.mill -> oluies/scotty. a git TAG, not a Maven coordinate -- Scotty is checked out beside the repo, not resolved from a registry",
+      "managerFilePatterns": [
+        "/^build\\.mill$/"
+      ],
+      "matchStrings": [
+        "val\\s+scottyTag\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "oluies/scotty",
+      "datasourceTemplate": "github-tags"
+    }
   ]
 }
