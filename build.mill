@@ -18,8 +18,8 @@ import mill.api.BuildCtx
   * The checkout is found by `scottyDir`; CI checks out the tag that `scottyTag` names.
   */
 object Versions {
-  val scala = "3.9.0"
-  val scalaJS = "1.22.0"
+  val scala = "3.10.1"
+  val scalaJS = "1.23.0"
   val upickle = "4.4.3"
   val cask = "0.11.3"
   val scalajsDom = "2.8.1"
